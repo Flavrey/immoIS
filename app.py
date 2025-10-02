@@ -1,4 +1,4 @@
-# streamlit_is_app.py
+# app.py
 import streamlit as st
 import pandas as pd
 from collections import defaultdict
@@ -258,11 +258,15 @@ if not projection_data:
 else:
     df = pd.DataFrame(projection_data)
     
-    # Formatage des colonnes pour la lisibilité
-    colonnes_euros = [col for col in df.columns if col not in ["Année", "TRI (%)"]]
+    # --- CORRECTION APPLIQUÉE ICI ---
+    # Formatage intelligent qui vérifie le type de la donnée avant de la formater
+    formatter_euros = lambda x: f"{x:,.0f} €" if isinstance(x, (int, float)) else x
+    formatter_percent = lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x
     
-    df_formate = df.style.format({col: "{:,.0f} €" for col in colonnes_euros}, na_rep='N/A') \
-                        .format({"TRI (%)": "{:.1f}%"}, na_rep='N/A') \
+    format_dict = {col: formatter_euros for col in df.columns if col not in ["Année", "TRI (%)"]}
+    format_dict["TRI (%)"] = formatter_percent
+    
+    df_formate = df.style.format(format_dict, na_rep='N/A') \
                         .set_properties(**{'text-align': 'right'})
 
     st.dataframe(df_formate, use_container_width=True, height=(duree_pret + 3) * 38)
@@ -270,10 +274,15 @@ else:
     # Indicateurs clés
     st.header("Indicateurs Clés du Projet")
     montant_pret = prix_achat + cout_travaux + frais_notaire - apport_personnel
-    df_numerique = df.loc[df['Année'] != "---"].drop(df[df['Année'].astype(str).str.contains("An")].index)
-    cashflow_moyen_investisseur = df_numerique["Cash-flow Net Invest."].mean() / 12 if not df_numerique.empty else 0
-    tri_final = df_numerique["TRI (%)"].iloc[-1] if not df_numerique.empty else 0
-    benefice_final = df_numerique["Bénéfice Net Total"].iloc[-1] if not df_numerique.empty else 0
+    # Filtrer les lignes non numériques pour le calcul des moyennes/dernières valeurs
+    df_numerique = df.dropna().loc[pd.to_numeric(df['Année'], errors='coerce').notna()]
+    
+    if not df_numerique.empty:
+        cashflow_moyen_investisseur = df_numerique["Cash-flow Net Invest."].mean() / 12
+        tri_final = df_numerique["TRI (%)"].iloc[-1]
+        benefice_final = df_numerique["Bénéfice Net Total"].iloc[-1]
+    else:
+        cashflow_moyen_investisseur = tri_final = benefice_final = 0
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Montant du Prêt", f"{montant_pret:,.0f} €")
