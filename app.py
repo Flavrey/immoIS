@@ -1,10 +1,10 @@
-# simulateur_sci_is_v18_streamlit.py
+# simulateur_sci_is_v19_streamlit_cca_switch.py
 #
 # Pour l'exécuter :
 # 1. Assurez-vous d'avoir les bibliothèques :
 #    pip install streamlit pandas numpy numpy-financial
 # 2. Lancez depuis votre terminal :
-#    streamlit run simulateur_sci_is_v18_streamlit.py
+#    streamlit run streamlit_app_v19.py
 
 import streamlit as st
 import pandas as pd
@@ -65,6 +65,8 @@ def generer_projection_sci_is(params):
         # Streamlit envoie des nombres, pas des strings.
         valeurs_num = params.copy()
         is_gerant_majoritaire = valeurs_num.pop("is_gerant_majoritaire", False)
+        # NOUVEAU LEVIER STRATÉGIQUE
+        autoriser_remboursement_cca = valeurs_num.pop("autoriser_remboursement_cca", True) 
     except (ValueError, TypeError):
         return [{"erreur": "Veuillez entrer des nombres valides."}]
 
@@ -200,7 +202,12 @@ def generer_projection_sci_is(params):
         tresorerie_disponible = tresorerie_sci_cumulee
         
         # 1. Remboursement CCA (Prioritaire, non fiscalisé)
-        remboursement_cca = min(tresorerie_disponible, solde_cca)
+        remboursement_cca = 0 # Initialisation
+        
+        # NOUVELLE CONDITION : On ne rembourse que si l'utilisateur l'autorise
+        if autoriser_remboursement_cca:
+            remboursement_cca = min(tresorerie_disponible, solde_cca)
+            
         tresorerie_disponible -= remboursement_cca
         solde_cca -= remboursement_cca
         
@@ -337,7 +344,7 @@ descriptions_calcul = {
 # --- INTERFACE GRAPHIQUE STREAMLIT ---
 def main():
     st.set_page_config(layout="wide", page_title="Simulateur SCI à l'IS")
-    st.title("Simulateur d'Investissement - SCI à l'IS (v18) 📈")
+    st.title("Simulateur d'Investissement - SCI à l'IS (v19) 📈")
     
     # --- Panneau Latéral (Sidebar) pour les entrées ---
     st.sidebar.title("Paramètres d'Entrée")
@@ -378,7 +385,14 @@ def main():
         taux_distrib_pc = st.number_input("Taux distrib. dividendes (%)", min_value=0.0, max_value=100.0, value=100.0, step=5.0, format="%.0f")
         inflation_pc = st.number_input("Inflation (%)", min_value=0.0, value=2.0, step=0.1, format="%.1f")
         revalo_bien_pc = st.number_input("Revalo. bien (%)", min_value=0.0, value=3.0, step=0.1, format="%.1f")
+        
+        # --- NOUVEAUX LEVIERS STRATÉGIQUES ---
         is_gerant_majoritaire = st.checkbox("Gérant Majoritaire (impact CS)", value=False)
+        autoriser_remboursement_cca = st.checkbox(
+            "Autoriser remboursement CCA", 
+            value=True, 
+            help="Si décoché, la SCI garde sa trésorerie pour capitaliser au lieu de rembourser l'apport de l'associé."
+        )
         
     # --- Collecte des paramètres pour le moteur ---
     params = {
@@ -392,7 +406,8 @@ def main():
         "duree_amort_immo": duree_amort_immo, "duree_amort_travaux": duree_amort_travaux,
         "duree_amort_meubles": duree_amort_meubles, "part_terrain_pc": part_terrain_pc,
         "taux_distrib_pc": taux_distrib_pc, "inflation_pc": inflation_pc, "revalo_bien_pc": revalo_bien_pc,
-        "is_gerant_majoritaire": is_gerant_majoritaire
+        "is_gerant_majoritaire": is_gerant_majoritaire,
+        "autoriser_remboursement_cca": autoriser_remboursement_cca # Ajout du nouveau paramètre
     }
 
     # --- Lancement de la simulation ---
